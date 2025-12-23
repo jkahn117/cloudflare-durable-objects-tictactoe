@@ -1,6 +1,6 @@
 {
-  "short_name": "TanStack App",
-  "name": "Create TanStack App Sample",
+  "short_name": "TicTacToe",
+  "name": "Durable Objects TicTacToe",
   "icons": [
     {
       "src": "favicon.ico",
