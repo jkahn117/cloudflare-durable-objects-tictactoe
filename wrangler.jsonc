@@ -20,5 +20,8 @@
       }
     ]
   },
-  "migrations": [{ "new_sqlite_classes": ["GameManager"], "tag": "v1" }]
+  "migrations": [{ "new_sqlite_classes": ["GameManager"], "tag": "v1" }],
+  "ai": {
+    "binding": "AI"
+  }
 }

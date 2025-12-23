@@ -65,7 +65,7 @@ function App() {
   const [isXNext, setIsXNext] = useState<boolean>(true);
   const [players] = useState<Players>({
     x: "You",
-    o: "Waiting...",
+    o: "TicTacToe Expert AI", //"Waiting...",
   });
   const [mySymbol] = useState<SymbolType>("X");
   const [winnerInfo, setWinnerInfo] = useState<WinnerStatus | null>(null);
@@ -98,6 +98,10 @@ function App() {
               setWinnerInfo({ winner: data.data.winner, line: [] });
             }
           }
+          break;
+        case "ai_thinking":
+          console.log("AI is thinking...");
+
           break;
         case "game_ended":
           setGame(null);

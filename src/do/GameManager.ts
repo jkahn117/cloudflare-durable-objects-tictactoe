@@ -5,9 +5,10 @@ import {
   NewGameParams,
   SymbolType,
   UpdateGameParams,
-} from "../types";
+} from "@/types";
+import { makeAIMove } from "./TicTacToeExpert";
 
-const initBoard: BoardType = new Array(9).fill(undefined);
+const initBoard: BoardType = new Array(9).fill(null);
 
 /**
  * GAME_MANAGER: DURABLE OBJECT / AGENT
@@ -80,16 +81,36 @@ export class GameManager extends Agent {
           if (!state || !state.id) {
             throw new Error("Game not found");
           }
-          const update = await this.updateState(state.id, data.data);
+          let game = await this.updateState(state.id, data.data);
 
-          const gameToUpdate = await this.loadGame(state.id);
-          if (gameToUpdate) {
-            await connection.setState(gameToUpdate);
+          await connection.setState(game);
+
+          this.broadcastGameUpdate(state.id, game);
+
+          if (game.oPlayer === "ai" && !game.isXNext && !game.winner) {
+            // don't block while AI is making its move
+            this.ctx.waitUntil(
+              (async () => {
+                this.broadcast(
+                  JSON.stringify({
+                    type: "ai_thinking",
+                    data: { gameId: state.id },
+                  })
+                );
+                // Small delay for UX
+                await new Promise((resolve) => setTimeout(resolve, 500));
+
+                const updatedGame = await this.makeAIPlay(state.id);
+                if (updatedGame) {
+                  this.broadcastGameUpdate(state.id, updatedGame);
+                }
+              })()
+            );
           }
 
           return {
-            type: "game_updated",
-            data: { ...update, timestamp: Date.now() },
+            type: "move_processed",
+            data: { success: true },
           };
         case "end_game":
           if (!state || !state.id) {
@@ -105,7 +126,7 @@ export class GameManager extends Agent {
       }
     })();
 
-    connection.send(JSON.stringify(result));
+    this.broadcast(JSON.stringify(result));
   }
 
   /**
@@ -128,6 +149,38 @@ export class GameManager extends Agent {
   }
 
   ///// HELPER METHODS
+  private async makeAIPlay(gameId: string): Promise<Game | undefined> {
+    const game = await this.loadGame(gameId);
+
+    if (!game || game.oPlayer !== "ai" || game.isXNext) return undefined;
+
+    if (game.winner) {
+      return undefined; // game is over
+    }
+
+    console.log("[GameManager] Making AI move");
+
+    try {
+      const aiMove = await makeAIMove(game);
+
+      if (aiMove < 0 || aiMove > 8 || game.board[aiMove] != null) {
+        console.error("[GameManager] Invalid AI move:", aiMove);
+        const fallbackMove = game.board.findIndex((square) => square === null);
+        if (fallbackMove < 0) {
+          throw new Error("[GameManager] No more moves available");
+        }
+        console.log("[GameManager] Fallback move:", fallbackMove);
+        return await this.applyMove(gameId, fallbackMove, "ai");
+      }
+
+      const updatedGame = await this.applyMove(gameId, aiMove, "ai");
+      return updatedGame;
+    } catch (error) {
+      console.error("[GameManager] Error making AI move:", error);
+      return undefined;
+    }
+  }
+
   private gameKey(gameId: string): string {
     return `game:${gameId}`;
   }
@@ -173,16 +226,13 @@ export class GameManager extends Agent {
    * @returns
    */
   private async createGame(params: NewGameParams): Promise<Game> {
-    const gameId = crypto.randomUUID();
-    const now = new Date();
-
     const game: Game = {
-      id: gameId,
+      id: crypto.randomUUID(),
       xPlayer: params.playerId,
       oPlayer: "ai",
       board: initBoard,
       isXNext: true,
-      updatedAt: now,
+      updatedAt: new Date(),
     };
 
     await this.saveGame(game);
@@ -192,11 +242,32 @@ export class GameManager extends Agent {
   private async updateState(
     gameId: string,
     params: UpdateGameParams
-  ): Promise<Partial<Game>> {
+  ): Promise<Game> {
+    // Validate request matches the game
     if (gameId !== params.gameId) {
       throw new Error("[GameManager] Game ID mismatch");
     }
+    // Apply the player's move
+    const game = await this.applyMove(
+      gameId,
+      params.spaceTaken,
+      params.playerId
+    );
+    return game;
+  }
 
+  /**
+   * Apply a move to the game (works for both human and AI)
+   * @param gameId Game to update
+   * @param move Position (0-8) to place the piece
+   * @param playerId Who is making the move ("You", "ai", etc)
+   * @returns Updated game state
+   */
+  private async applyMove(
+    gameId: string,
+    move: number,
+    playerId: string
+  ): Promise<Game> {
     const game = await this.loadGame(gameId);
     if (!game) {
       throw new Error("[GameManager] Game not found");
@@ -204,15 +275,27 @@ export class GameManager extends Agent {
 
     const currentTurnSymbol: SymbolType = game.isXNext ? "X" : "O";
 
-    if (game.isXNext && game.xPlayer !== params.playerId) {
-      throw new Error("Not your turn");
+    const isXPlayer = game.xPlayer === playerId;
+    const isOPlayer = game.oPlayer === playerId;
+
+    if (game.isXNext && !isXPlayer) {
+      throw new Error("[GameManager] Not X player's turn");
+    }
+    if (!game.isXNext && !isOPlayer) {
+      throw new Error("[GameManager] Not O player's turn");
     }
 
-    const board = (await this.ctx.storage.get<BoardType>("board")) || initBoard;
-    const newBoard = [...board];
-    newBoard[params.spaceTaken] = currentTurnSymbol;
+    // Validate move is valid
+    if (move < 0 || move > 8) {
+      throw new Error(`[GameManager] Invalid move position: ${move}`);
+    }
+    if (game.board[move] !== null) {
+      console.log(game.board[move]);
+      throw new Error(`[GameManager] Position ${move} is already occupied`);
+    }
 
-    game.board = newBoard;
+    // Apply the move
+    game.board[move] = currentTurnSymbol;
     game.isXNext = !game.isXNext;
     game.updatedAt = new Date();
 
@@ -222,13 +305,34 @@ export class GameManager extends Agent {
     }
 
     await this.saveGame(game);
+    console.log(
+      `[GameManager] Move applied: ${playerId} placed ${currentTurnSymbol} at ${move}`
+    );
 
-    return {
-      board: game.board,
-      isXNext: game.isXNext,
-      updatedAt: game.updatedAt,
-      ...(winner && { winner }),
+    return game;
+  }
+
+  /**
+   * Broadcast a game update to all connections watching this game
+   * @param gameId The game that was updated
+   * @param game The updated game state
+   */
+  private broadcastGameUpdate(gameId: string, game: Game): void {
+    const updateMessage = {
+      type: "game_updated",
+      data: {
+        id: game.id,
+        board: game.board,
+        isXNext: game.isXNext,
+        winner: game.winner,
+        updatedAt: game.updatedAt,
+        timestamp: Date.now(),
+      },
     };
+    // Send to all active connections
+    // The Agent/PartyKit base class has a broadcast() method
+    this.broadcast(JSON.stringify(updateMessage));
+    console.log(`[GameManager] Broadcasted update for game ${gameId}`);
   }
 
   private async calculateWinner(

@@ -3,7 +3,11 @@ export interface GameMessage {
   data: Game | Partial<Game>;
 }
 
-export type GameStatus = "game_created" | "game_updated" | "game_ended";
+export type GameStatus =
+  | "game_created"
+  | "game_updated"
+  | "game_ended"
+  | "ai_thinking";
 
 export interface Game {
   id: string;
