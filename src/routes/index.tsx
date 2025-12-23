@@ -20,9 +20,19 @@ export const Route = createFileRoute("/")({
   staticData: {
     title: "Tic Tac Toe",
   },
-});
+  loader: async () => {
+    const serverUrl = import.meta.env.VITE_SERVER_URL || "localhost:3000";
+    const protocol = serverUrl.includes("localhost") ? "ws" : "wss";
 
-const baseUrl = "ws://localhost:3000/api/agents/game-manager";
+    if (!serverUrl && import.meta.env.PROD) {
+      throw new Error("VITE_SERVER_URL must be set in production");
+    }
+
+    return {
+      wsUrl: `${protocol}://${serverUrl}/api/agents/game-manager/lobby`,
+    };
+  },
+});
 
 type ViewType = "home" | "searching" | "playing";
 
@@ -57,6 +67,8 @@ interface SquareProps {
 // });
 
 function App() {
+  const { wsUrl } = Route.useLoaderData();
+
   // UI States: 'home', 'searching', 'playing', 'game-over'
   const [view, setView] = useState<ViewType>("home");
   const [board, setBoard] = useState<(SymbolType | null)[]>(
@@ -72,7 +84,7 @@ function App() {
 
   const [game, setGame] = useState<Game | null>(null);
   const { lastJsonMessage, readyState, sendJsonMessage } =
-    useWebSocket<GameMessage>(`${baseUrl}/lobby`, {});
+    useWebSocket<GameMessage>(wsUrl, {});
 
   useEffect(() => {
     if (lastJsonMessage) {
