@@ -31,17 +31,17 @@ export class GameManager extends Agent {
    * @param ctx
    */
   override async onConnect(connection: Connection, ctx: ConnectionContext) {
-    console.log("[GameManager] onConnect called");
+    // console.log("[GameManager] onConnect called");
     const url = new URL(ctx.request.url);
     const gameId = url.pathname
       .split("/api/agents/game-manager/")[1]
       .split("?")[0];
 
-    console.log("[GameManager] Connection details:", {
-      gameId,
-      connectionId: connection.id,
-      url: ctx.request.url,
-    });
+    // console.log("[GameManager] Connection details:", {
+    //   gameId,
+    //   connectionId: connection.id,
+    //   url: ctx.request.url,
+    // });
 
     await connection.setState({ id: gameId });
     connection.send(
@@ -59,11 +59,11 @@ export class GameManager extends Agent {
    * @param message
    */
   override async onMessage(connection: Connection<Game>, message: WSMessage) {
-    console.log("[GameManager] onMessage called! 🎉", {
-      connectionId: connection.id,
-      messageType: typeof message,
-      message: message.toString(),
-    });
+    // console.log("[GameManager] onMessage called! 🎉", {
+    //   connectionId: connection.id,
+    //   messageType: typeof message,
+    //   message: message.toString(),
+    // });
 
     const data = JSON.parse(message.toString());
     const state = connection.state;
@@ -134,9 +134,9 @@ export class GameManager extends Agent {
    * @param connection
    */
   override async onClose(connection: Connection<Game>) {
-    console.log("[GameManager] onClose called:", {
-      connectionId: connection.id,
-    });
+    // console.log("[GameManager] onClose called:", {
+    //   connectionId: connection.id,
+    // });
     const state = connection.state;
 
     connection.send(
@@ -210,15 +210,15 @@ export class GameManager extends Agent {
     await this.ctx.storage.delete(this.gameKey(gameId));
   }
 
-  private async hasGame(gameId: string): Promise<boolean> {
-    return (await this.loadGame(gameId)) !== undefined;
-  }
+  // private async hasGame(gameId: string): Promise<boolean> {
+  //   return (await this.loadGame(gameId)) !== undefined;
+  // }
 
-  private async ensureGameExists(gameId: string): Promise<void> {
-    if (!(await this.hasGame(gameId))) {
-      throw new Error("Game not found");
-    }
-  }
+  // private async ensureGameExists(gameId: string): Promise<void> {
+  //   if (!(await this.hasGame(gameId))) {
+  //     throw new Error("Game not found");
+  //   }
+  // }
 
   /**
    *

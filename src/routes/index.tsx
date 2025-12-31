@@ -340,7 +340,7 @@ function App() {
                     ? "It's a Draw!"
                     : `${
                         winnerInfo.winner === "X" ? players.x : players.o
-                      } Wins!`}
+                      } Win${winnerInfo.winner === "X" ? "" : "s"}!`}
                 </div>
               ) : (
                 <div className="space-y-1">

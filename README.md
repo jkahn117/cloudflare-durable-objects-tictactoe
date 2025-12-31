@@ -1,6 +1,6 @@
 # TicTacToe with Cloudflare Durable Objects
 
-A real-time multiplayer Tic-Tac-Toe game that showcases the power of Cloudflare Durable Objects, Workers AI, and modern React tooling. Play against an AI expert powered by Cloudflare's Llama AI model.
+A real-time multiplayer Tic-Tac-Toe game that showcases the power of Cloudflare Durable Objects, Workers AI, and modern React tooling. Play against an AI expert powered by OpenAI's GPT-OSS 20B model via Cloudflare Workers AI for superior strategic reasoning.
 
 **Repository:** https://github.com/jkahn117/cloudflare-durable-objects-tictactoe
 
@@ -19,7 +19,7 @@ A real-time multiplayer Tic-Tac-Toe game that showcases the power of Cloudflare 
 - **Frontend**: React 19, TanStack Router, TanStack Start
 - **Styling**: Tailwind CSS v4
 - **Backend**: Cloudflare Workers + Durable Objects
-- **AI**: Cloudflare Workers AI (Llama 4 Scout)
+- **AI**: Cloudflare Workers AI (OpenAI GPT-OSS 20B for enhanced reasoning)
 - **WebSockets**: Agents library (built on Durable Objects)
 - **Build Tool**: Vite
 
@@ -39,9 +39,9 @@ A real-time multiplayer Tic-Tac-Toe game that showcases the power of Cloudflare 
 **TicTacToeExpert** (`src/do/TicTacToeExpert.ts`)
 
 - AI opponent powered by Cloudflare Workers AI
-- Uses Llama 4 Scout model for strategic move generation
+- Uses OpenAI GPT-OSS 20B model for enhanced strategic reasoning and move generation
 - Implements classic Tic-Tac-Toe strategy (win, block, fork, center control)
-- Returns optimal moves based on current board state
+- Returns optimal moves based on current board state with intelligent validation and fallback logic
 
 #### WebSocket Flow
 
@@ -116,7 +116,7 @@ This command:
 **Required Bindings:**
 
 - `GAME_MANAGER`: Durable Object binding for GameManager class
-- `AI`: Workers AI binding for Llama model
+- `AI`: Workers AI binding for OpenAI GPT-OSS 20B model
 
 ### Environment Variables
 

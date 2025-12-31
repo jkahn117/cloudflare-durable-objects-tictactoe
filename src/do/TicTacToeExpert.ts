@@ -64,13 +64,9 @@ If the board is invalid or all positions are filled, output the first available 
 const userPrompt = "Here is the current game board: ";
 
 export async function makeAIMove(game: Game): Promise<number> {
-  const messages = [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: `${userPrompt}\n${JSON.stringify(game.board)}` },
-  ];
-
-  const result = await env.AI.run("@cf/meta/llama-4-scout-17b-16e-instruct", {
-    messages,
+  const result = await env.AI.run("@cf/openai/gpt-oss-20b", {
+    instructions: systemPrompt,
+    input: `${userPrompt}\n${JSON.stringify(game.board)}`,
     response_format: {
       type: "json_schema",
       json_schema: {
@@ -79,5 +75,37 @@ export async function makeAIMove(game: Game): Promise<number> {
     },
   });
 
-  return parseInt(result.response);
+  // Parse AI response with validation and better error handling
+  if (result.output?.length) {
+    for (const output of result.output) {
+      if (output.status === "completed" && output.type === "message") {
+        const content = (output as ResponseOutputMessage).content;
+        for (const item of content) {
+          if (item.type === "output_text") {
+            const text = (item as ResponseOutputText).text.trim();
+            const move = parseInt(text, 10);
+
+            // Validate move is a number, in range, and position is empty
+            if (
+              !isNaN(move) &&
+              move >= 0 &&
+              move <= 8 &&
+              game.board[move] === null
+            ) {
+              return move;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Fallback: find first empty position instead of returning 0
+  const emptyPosition = game.board.findIndex((pos) => pos === null);
+  if (emptyPosition !== -1) {
+    return emptyPosition;
+  }
+
+  // Last resort: no valid moves available
+  throw new Error("No valid moves available on the board");
 }
