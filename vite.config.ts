@@ -11,11 +11,6 @@ const config = defineConfig({
     devtools(),
     cloudflare({
       viteEnvironment: { name: "ssr" },
-      // auxiliaryWorkers: [
-      //   {
-      //     configPath: "./src/backend/wrangler.jsonc",
-      //   },
-      // ],
     }),
     viteTsConfigPaths({
       projects: ["./tsconfig.json"],
@@ -24,6 +19,17 @@ const config = defineConfig({
     tanstackStart(),
     viteReact(),
   ],
+  esbuild: {
+    // This tells Vite/ESBuild how to handle the @callable decorator
+    tsconfigRaw: {
+      compilerOptions: {
+        experimentalDecorators: true,
+      },
+    },
+  },
+  ssr: {
+    noExternal: [/@cloudflare\/agents/, /@/], // Ensure agents and your @/ code are processed
+  },
 });
 
 export default config;

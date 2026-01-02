@@ -27,6 +27,7 @@
     "react-dom": "^19.2.3",
     "react-use-websocket": "^4.13.0",
     "tailwindcss": "^4.1.18",
+    "unique-names-generator": "^4.7.1",
     "vite-tsconfig-paths": "^5.1.4"
   },
   "devDependencies": {

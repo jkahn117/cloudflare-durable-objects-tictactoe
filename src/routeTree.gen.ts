@@ -9,49 +9,65 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LobbyRouteImport } from './routes/lobby'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ApiAgentsGameManagerNameRouteImport } from './routes/api/agents/game-manager/$name'
+import { Route as GameSlugRouteImport } from './routes/game/$slug'
 
+const LobbyRoute = LobbyRouteImport.update({
+  id: '/lobby',
+  path: '/lobby',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAgentsGameManagerNameRoute =
-  ApiAgentsGameManagerNameRouteImport.update({
-    id: '/api/agents/game-manager/$name',
-    path: '/api/agents/game-manager/$name',
-    getParentRoute: () => rootRouteImport,
-  } as any)
+const GameSlugRoute = GameSlugRouteImport.update({
+  id: '/game/$slug',
+  path: '/game/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/api/agents/game-manager/$name': typeof ApiAgentsGameManagerNameRoute
+  '/lobby': typeof LobbyRoute
+  '/game/$slug': typeof GameSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/api/agents/game-manager/$name': typeof ApiAgentsGameManagerNameRoute
+  '/lobby': typeof LobbyRoute
+  '/game/$slug': typeof GameSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/api/agents/game-manager/$name': typeof ApiAgentsGameManagerNameRoute
+  '/lobby': typeof LobbyRoute
+  '/game/$slug': typeof GameSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/agents/game-manager/$name'
+  fullPaths: '/' | '/lobby' | '/game/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/agents/game-manager/$name'
-  id: '__root__' | '/' | '/api/agents/game-manager/$name'
+  to: '/' | '/lobby' | '/game/$slug'
+  id: '__root__' | '/' | '/lobby' | '/game/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ApiAgentsGameManagerNameRoute: typeof ApiAgentsGameManagerNameRoute
+  LobbyRoute: typeof LobbyRoute
+  GameSlugRoute: typeof GameSlugRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/lobby': {
+      id: '/lobby'
+      path: '/lobby'
+      fullPath: '/lobby'
+      preLoaderRoute: typeof LobbyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -59,11 +75,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/agents/game-manager/$name': {
-      id: '/api/agents/game-manager/$name'
-      path: '/api/agents/game-manager/$name'
-      fullPath: '/api/agents/game-manager/$name'
-      preLoaderRoute: typeof ApiAgentsGameManagerNameRouteImport
+    '/game/$slug': {
+      id: '/game/$slug'
+      path: '/game/$slug'
+      fullPath: '/game/$slug'
+      preLoaderRoute: typeof GameSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -71,7 +87,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ApiAgentsGameManagerNameRoute: ApiAgentsGameManagerNameRoute,
+  LobbyRoute: LobbyRoute,
+  GameSlugRoute: GameSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

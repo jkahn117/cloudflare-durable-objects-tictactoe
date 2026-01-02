@@ -1,53 +1,41 @@
-import handler, { createServerEntry } from "@tanstack/react-start/server-entry";
-import { getAgentByName } from "agents";
-import { GameManager } from "./do/GameManager";
-import { env } from "cloudflare:workers";
+// import handler, { createServerEntry } from "@tanstack/react-start/server-entry";
+// import { LobbyAgent } from "@/agents/Lobby";
+// import { GameAgent } from "@/agents/Game";
 
-export { GameManager } from "./do/GameManager";
+// export { LobbyAgent, GameAgent };
 
-export default createServerEntry({
-  async fetch(request) {
-    const url = new URL(request.url);
-    const isWebSocketUpgrade = request.headers.get("upgrade") === "websocket";
+// export default createServerEntry({
+//   fetch(request, options) {
+//     return handler.fetch(request, options);
+//   },
+// });
 
-    // console.log("[Server] Incoming request:", {
-    //   method: request.method,
-    //   path: url.pathname,
-    //   isWebSocketUpgrade,
-    //   headers: Object.fromEntries(request.headers.entries()),
-    // });
+import {
+  createStartHandler,
+  defaultStreamHandler,
+} from "@tanstack/react-start/server";
 
-    if (
-      isWebSocketUpgrade &&
-      url.pathname.startsWith("/api/agents/game-manager")
-    ) {
-      // console.log("[Server] Upgrading to WebSocket, routing to agent");
-      const gameId = url.pathname
-        .split("/api/agents/game-manager/")[1]
-        .split("?")[0];
-      // console.log("[Server] Routing WebSocket to GameManager:", gameId);
+// Export your Agents for Cloudflare to find
+export { LobbyAgent } from "@/agents/Lobby";
+export { GameAgent } from "@/agents/Game";
 
-      try {
-        const agent = await getAgentByName<Env, GameManager>(
-          env.GAME_MANAGER,
-          gameId
-        );
-        const resp = await agent.fetch(request);
-
-        // console.log("[Server] WebSocket upgrade response:", {
-        //   status: resp.status,
-        //   hasWebSocket: !!resp.webSocket,
-        // });
-
-        return resp;
-      } catch (error: any) {
-        console.error("[Server] Error routing to agent:", error);
-        return new Response("WebSocket connection failed: " + error.message, {
-          status: 500,
-        });
-      }
-    }
-
-    return handler.fetch(request);
-  },
+// Create the handler using the callback pattern
+const handler = createStartHandler(({ request, router, responseHeaders }) => {
+  return defaultStreamHandler({
+    request,
+    router,
+    responseHeaders,
+  });
 });
+
+export default {
+  async fetch(request: Request, env: Env) {
+    // We pass the Cloudflare 'env' into the 'context' property.
+    // TanStack Start merges this with the router context.
+    return handler(request, {
+      context: {
+        env,
+      } as any,
+    });
+  },
+};

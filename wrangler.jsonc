@@ -15,31 +15,37 @@
   "durable_objects": {
     "bindings": [
       {
-        "name": "GAME_MANAGER",
-        "class_name": "GameManager"
+        "name": "GameAgent",
+        "class_name": "GameAgent"
+      },
+      {
+        "name": "LobbyAgent",
+        "class_name": "LobbyAgent"
       }
     ]
   },
-  "migrations": [{ "new_sqlite_classes": ["GameManager"], "tag": "v1" }],
+  "migrations": [
+    { "new_sqlite_classes": ["GameAgent", "LobbyAgent"], "tag": "v1" }
+  ],
   "ai": {
     "binding": "AI"
-  },
-  "env": {
-    "production": {
-      "vars": {
-        "VITE_SERVER_URL": "tictactoe-production.jkahn-demo-1.workers.dev"
-      },
-      "ai": {
-        "binding": "AI"
-      },
-      "durable_objects": {
-        "bindings": [
-          {
-            "name": "GAME_MANAGER",
-            "class_name": "GameManager"
-          }
-        ]
-      }
-    }
   }
+  // "env": {
+  //   "production": {
+  //     "vars": {
+  //       "VITE_SERVER_URL": "tictactoe-production.jkahn-demo-1.workers.dev"
+  //     },
+  //     "ai": {
+  //       "binding": "AI"
+  //     },
+  //     "durable_objects": {
+  //       "bindings": [
+  //         {
+  //           "name": "GAME_MANAGER",
+  //           "class_name": "GameManager"
+  //         }
+  //       ]
+  //     }
+  //   }
+  // }
 }

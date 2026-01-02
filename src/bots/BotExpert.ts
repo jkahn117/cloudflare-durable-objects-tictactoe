@@ -1,7 +1,8 @@
-import { env } from "cloudflare:workers";
-import { Game } from "@/types";
+import { BaseBotPlayer } from "./BotPlayer";
+import { Board } from "../types";
 
-const systemPrompt = `You are an expert Tic-Tac-Toe player with perfect strategic knowledge. Your symbol is O, and your opponent plays X.
+export class BotExpert extends BaseBotPlayer {
+  readonly systemPrompt = `You are an expert Tic-Tac-Toe player with perfect strategic knowledge. Your symbol is O, and your opponent plays X.
 ## Game Rules
 - The board has 9 positions indexed 0-8 (left to right, top to bottom):
   0 | 1 | 2
@@ -61,51 +62,48 @@ Output: 2
 ## Error Handling
 If the board is invalid or all positions are filled, output the first available empty position. If no moves are possible, output: -1`;
 
-const userPrompt = "Here is the current game board: ";
+  readonly userPrompt = "Here is the current game board: ";
 
-export async function makeAIMove(game: Game): Promise<number> {
-  const result = await env.AI.run("@cf/openai/gpt-oss-20b", {
-    instructions: systemPrompt,
-    input: `${userPrompt}\n${JSON.stringify(game.board)}`,
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        type: "number",
+  protected async generateMove(board: Board): Promise<number | null> {
+    const result = await this.env.AI.run("@cf/openai/gpt-oss-20b", {
+      instructions: this.systemPrompt,
+      input: `${this.userPrompt}\n${JSON.stringify(board)}`,
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          type: "number",
+        },
       },
-    },
-  });
+    });
 
-  // Parse AI response with validation and better error handling
-  if (result.output?.length) {
-    for (const output of result.output) {
-      if (output.status === "completed" && output.type === "message") {
-        const content = (output as ResponseOutputMessage).content;
-        for (const item of content) {
-          if (item.type === "output_text") {
-            const text = (item as ResponseOutputText).text.trim();
-            const move = parseInt(text, 10);
+    return this.parseAIResponse(result, board);
+  }
 
-            // Validate move is a number, in range, and position is empty
-            if (
-              !isNaN(move) &&
-              move >= 0 &&
-              move <= 8 &&
-              game.board[move] === null
-            ) {
-              return move;
+  private parseAIResponse(result: any, board: Board): number | null {
+    if (result.output?.length) {
+      for (const output of result.output) {
+        if (output.status === "completed" && output.type === "message") {
+          const content = (output as ResponseOutputMessage).content;
+          for (const item of content) {
+            if (item.type === "output_text") {
+              const text = (item as ResponseOutputText).text.trim();
+              const move = parseInt(text, 10);
+
+              // Validate move is a number, in range, and position is empty
+              if (
+                !isNaN(move) &&
+                move >= 0 &&
+                move <= 8 &&
+                board[move] === null
+              ) {
+                return move;
+              }
             }
           }
         }
       }
     }
-  }
 
-  // Fallback: find first empty position instead of returning 0
-  const emptyPosition = game.board.findIndex((pos) => pos === null);
-  if (emptyPosition !== -1) {
-    return emptyPosition;
+    return null;
   }
-
-  // Last resort: no valid moves available
-  throw new Error("No valid moves available on the board");
 }

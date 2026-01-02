@@ -22,6 +22,10 @@
     "noUncheckedSideEffectImports": true,
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+
+    /* need for @callable */
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   }
 }

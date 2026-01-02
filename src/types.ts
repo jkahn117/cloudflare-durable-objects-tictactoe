@@ -1,34 +1,50 @@
-export interface GameMessage {
-  type: GameStatus;
-  data: Game | Partial<Game>;
+export type Players = {
+  X: Player;
+  O: Player;
+};
+
+type BasePlayer = {
+  name: string;
+  symbol: SymbolType;
+  pending: boolean;
+};
+
+export type HumanPlayer = BasePlayer & {
+  type: PlayerType.HUMAN;
+};
+
+export type AIPlayer = BasePlayer & {
+  type: PlayerType.AI;
+  level: AILevel;
+};
+
+export type Player = HumanPlayer | AIPlayer;
+
+export enum PlayerType {
+  HUMAN = "human",
+  AI = "ai",
 }
 
-export type GameStatus =
-  | "game_created"
-  | "game_updated"
-  | "game_ended"
-  | "ai_thinking";
-
-export interface Game {
-  id: string;
-  xPlayer: string;
-  oPlayer: string;
-  board: BoardType;
-  isXNext: boolean;
-  winner?: SymbolType | "Draw" | undefined;
-  updatedAt: Date;
+export enum SymbolType {
+  X = "X",
+  O = "O",
 }
 
-export interface NewGameParams {
-  type: "head-to-head" | "vs-ai";
-  playerId: string;
+export enum AILevel {
+  BEGINNER = "beginner",
+  INTERMEDIATE = "intermediate",
+  EXPERT = "expert",
 }
 
-export interface UpdateGameParams {
-  gameId: string;
-  playerId: string;
-  spaceTaken: number;
-}
+export type Board = (SymbolType | null)[];
 
-export type SymbolType = "X" | "O";
-export type BoardType = (SymbolType | undefined)[];
+export type Game = {
+  players: Players;
+  board: Board;
+  winner?: SymbolType | "Draw" | null;
+};
+
+export type GameConfig = {
+  opponentType: "human" | "ai";
+  aiLevel?: AILevel;
+};
