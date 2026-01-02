@@ -37,18 +37,18 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-slate-900">
+        <div className="min-h-screen bg-background flex items-center justify-center p-4">
           {children}
           {/* Background decoration */}
-          <div className="fixed top-0 left-0 w-full h-full -z-10 opacity-5 pointer-events-none">
+          <div className="fixed top-0 left-0 w-full h-full -z-10 opacity-[0.02] pointer-events-none">
             <div className="absolute top-10 left-10">
-              <X className="w-32 h-32" />
+              <X className="w-32 h-32 text-foreground" />
             </div>
             <div className="absolute bottom-10 right-10">
-              <Circle className="w-32 h-32" />
+              <Circle className="w-32 h-32 text-foreground" />
             </div>
             <div className="absolute top-1/2 right-20">
-              <X className="w-20 h-20" />
+              <X className="w-20 h-20 text-foreground" />
             </div>
           </div>
         </div>

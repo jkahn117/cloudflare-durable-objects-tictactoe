@@ -19,16 +19,23 @@ const config = defineConfig({
     tanstackStart(),
     viteReact(),
   ],
+
   esbuild: {
-    // This tells Vite/ESBuild how to handle the @callable decorator
-    tsconfigRaw: {
-      compilerOptions: {
-        experimentalDecorators: true,
-      },
-    },
+    // Support for standard decorators (TypeScript 5.0+)
+    target: 'es2022',
   },
   ssr: {
-    noExternal: [/@cloudflare\/agents/, /@/], // Ensure agents and your @/ code are processed
+    noExternal: [
+      /@cloudflare\/agents/, 
+      /@\//, 
+      "@radix-ui/react-accordion",
+      "@radix-ui/react-radio-group",
+      "@radix-ui/react-label",
+      "@radix-ui/react-slot",
+      "class-variance-authority",
+      "clsx",
+      "tailwind-merge"
+    ], // Ensure agents and your @/ code are processed
   },
 });
 

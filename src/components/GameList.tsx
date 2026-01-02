@@ -1,4 +1,5 @@
 import { GameState } from "@/agents/Game";
+import { Button } from "@/components/ui/button";
 
 interface GamesListProps {
   games: GameState[];
@@ -8,7 +9,7 @@ interface GamesListProps {
 export function GamesList({ games, type, onJoin }: GamesListProps) {
   if (games.length === 0) {
     return (
-      <p className="text-slate-400 text-center py-4">
+      <p className="text-muted-foreground text-center py-8 text-sm">
         No games {type === "seeking" ? "seeking players" : "in progress"}
       </p>
     );
@@ -19,21 +20,21 @@ export function GamesList({ games, type, onJoin }: GamesListProps) {
       {games.map((game) => (
         <div
           key={game.slug}
-          className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200"
+          className="flex items-center justify-between px-4 py-3 bg-background rounded-md border hover:border-primary/50 transition-colors"
         >
           <div>
-            <p className="font-semibold">{game.slug}</p>
-            <p className="text-xs text-slate-500">
+            <p className="font-medium text-sm">{game.slug}</p>
+            <p className="text-xs text-muted-foreground">
               {new Date(game.createdAt).toLocaleTimeString()}
             </p>
           </div>
           {type === "seeking" && onJoin && (
-            <button
+            <Button
               onClick={() => onJoin(game.slug)}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+              size="sm"
             >
               Join
-            </button>
+            </Button>
           )}
         </div>
       ))}

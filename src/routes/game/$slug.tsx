@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { RefreshCw, Trophy, Loader2 } from "lucide-react";
+import { RefreshCw, Trophy, Loader2, X, Circle } from "lucide-react";
 import { AILevel, PlayerType, SymbolType } from "@/types";
 import { GameBoard } from "@/components/GameBoard";
 import { PlayerCard } from "@/components/PlayerCard";
@@ -118,42 +118,57 @@ function Game() {
 
   return (
     <div className="w-full max-w-md">
-      <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
-        {/* Header */}
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <h1 className="font-bold text-xl">Game: {slug}</h1>
-            <p className="text-xs text-slate-500">You are {mySymbol}</p>
+      <div className="bg-card rounded-lg shadow-sm border overflow-hidden">
+        {/* Header with prominent player symbol */}
+        <div className="px-6 py-4 border-b">
+          <div className="flex items-center justify-between mb-3">
+            <h1 className="font-semibold text-base text-muted-foreground">Game: {slug}</h1>
+            <button
+              onClick={() => navigate({ to: "/lobby" })}
+              className="p-2 hover:bg-accent rounded-md transition"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
           </div>
-          <button
-            onClick={() => navigate({ to: "/lobby" })}
-            className="p-2 hover:bg-slate-100 rounded-full transition"
-          >
-            <RefreshCw className="w-5 h-5" />
-          </button>
+          {/* Prominent "You are" indicator */}
+          <div className="flex items-center gap-3 bg-primary/10 border-2 border-primary rounded-md px-4 py-3">
+            <div className="flex items-center justify-center w-10 h-10 bg-primary rounded-md">
+              {mySymbol === SymbolType.X ? (
+                <X className="w-6 h-6 text-primary-foreground" strokeWidth={3} />
+              ) : (
+                <Circle className="w-5 h-5 text-primary-foreground" strokeWidth={3} />
+              )}
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-medium text-muted-foreground">You are playing as</p>
+              <p className="text-base font-bold text-foreground">{mySymbol}</p>
+            </div>
+          </div>
         </div>
 
         {/* Game Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-5">
           {/* Player Cards */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <PlayerCard
               player={gameState.game.players.X}
               isActive={currentTurn === SymbolType.X}
+              isCurrentPlayer={mySymbol === SymbolType.X}
             />
             <PlayerCard
               player={gameState.game.players.O}
               isActive={currentTurn === SymbolType.O}
+              isCurrentPlayer={mySymbol === SymbolType.O}
             />
           </div>
 
           {/* Waiting Message */}
           {gameState.waitingForPlayers && (
-            <div className="text-center py-4 bg-yellow-50 rounded-lg">
-              <p className="font-semibold text-yellow-800">
+            <div className="text-center py-3 bg-accent rounded-md">
+              <p className="font-medium text-sm text-foreground">
                 Waiting for opponent...
               </p>
-              <p className="text-sm text-yellow-600">{timeWaiting}s</p>
+              <p className="text-xs text-muted-foreground">{timeWaiting}s</p>
             </div>
           )}
 
@@ -168,18 +183,18 @@ function Game() {
           )}
 
           {/* Status */}
-          <div className="text-center h-12 flex items-center justify-center">
+          <div className="text-center h-10 flex items-center justify-center">
             {gameState.game.winner ? (
-              <div className="flex items-center gap-2 text-green-600 font-bold">
-                <Trophy className="w-5 h-5" />
+              <div className="flex items-center gap-2 text-primary font-semibold text-sm">
+                <Trophy className="w-4 h-4" />
                 {gameState.game.winner === "Draw"
                   ? "It's a Draw!"
                   : `${gameState.game.winner} Wins!`}
               </div>
             ) : isMyTurn ? (
-              <p className="text-indigo-600 font-bold">Your Turn</p>
+              <p className="text-primary font-semibold text-sm">Your Turn</p>
             ) : (
-              <div className="flex items-center gap-2 text-slate-400">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Waiting for opponent...
               </div>
@@ -190,7 +205,7 @@ function Game() {
           {gameState.game.winner && (
             <button
               onClick={() => navigate({ to: "/lobby" })}
-              className="w-full py-3 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 transition"
+              className="w-full py-2.5 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition text-sm"
             >
               Back to Lobby
             </button>
@@ -201,33 +216,33 @@ function Game() {
       {/* Switch to AI Prompt */}
       {showSwitchPrompt && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm space-y-4">
-            <h3 className="text-xl font-bold">No opponent found</h3>
-            <p className="text-slate-600">
+          <div className="bg-card rounded-lg p-6 max-w-sm space-y-4 shadow-lg">
+            <h3 className="text-base font-semibold">No opponent found</h3>
+            <p className="text-sm text-muted-foreground">
               Would you like to play against AI instead?
             </p>
             <div className="space-y-2">
               <button
                 onClick={() => handleSwitchToAI(AILevel.BEGINNER)}
-                className="w-full py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                className="w-full py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition text-sm font-medium"
               >
                 Beginner AI
               </button>
               <button
                 onClick={() => handleSwitchToAI(AILevel.INTERMEDIATE)}
-                className="w-full py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
+                className="w-full py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition text-sm font-medium"
               >
                 Intermediate AI
               </button>
               <button
                 onClick={() => handleSwitchToAI(AILevel.EXPERT)}
-                className="w-full py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                className="w-full py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition text-sm font-medium"
               >
                 Expert AI
               </button>
               <button
                 onClick={() => setShowSwitchPrompt(false)}
-                className="w-full py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300"
+                className="w-full py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition text-sm font-medium"
               >
                 Keep Waiting
               </button>

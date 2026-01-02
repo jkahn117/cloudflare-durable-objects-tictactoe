@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Gamepad2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
   component: Welcome,
@@ -28,23 +29,20 @@ function Welcome() {
   };
 
   return (
-    <div className="text-center space-y-6 max-w-md">
-      <div className="bg-indigo-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
-        <Gamepad2 className="text-indigo-600 w-10 h-10" />
+    <div className="text-center space-y-5 max-w-md">
+      <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto">
+        <Gamepad2 className="text-primary w-8 h-8" />
       </div>
       <div>
-        <h1 className="text-4xl font-bold mb-2">TicTacToe.io</h1>
-        <p className="text-slate-600">
+        <h1 className="text-3xl font-bold mb-2">TicTacToe.io</h1>
+        <p className="text-muted-foreground text-sm">
           Play against AI or challenge other players in real-time!
         </p>
       </div>
-      <button
-        onClick={handleEnterLobby}
-        className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-semibold shadow-lg transition"
-      >
+      <Button className="w-full" onClick={handleEnterLobby}>
         Enter Lobby
-      </button>
-      <p className="text-sm text-slate-400">
+      </Button>
+      <p className="text-xs text-muted-foreground">
         Redirecting in {countdown} second{countdown !== 1 ? "s" : ""}...
       </p>
     </div>

@@ -4,32 +4,38 @@ import { Player, SymbolType } from "@/types";
 interface PlayerCardProps {
   player: Player;
   isActive: boolean;
+  isCurrentPlayer?: boolean;
 }
-export function PlayerCard({ player, isActive }: PlayerCardProps) {
+export function PlayerCard({ player, isActive, isCurrentPlayer }: PlayerCardProps) {
   return (
     <div
-      className={`p-4 rounded-2xl border-2 transition-all ${
+      className={`p-3 rounded-lg border transition-all ${
         isActive
-          ? `${
-              player.symbol === SymbolType.X
-                ? "bg-blue-50 border-blue-400"
-                : "bg-rose-50 border-rose-400"
-            } scale-105 shadow-md`
-          : "bg-slate-50 border-transparent opacity-60"
-      }`}
+          ? "bg-accent border-primary shadow-sm scale-[1.02]"
+          : "bg-muted/30 border-border opacity-60"
+      } ${isCurrentPlayer ? "ring-2 ring-primary ring-offset-2" : ""}`}
     >
-      <div className="flex items-center gap-2 mb-1">
-        {player.symbol === SymbolType.X ? (
-          <X className="w-4 h-4 text-blue-500" />
-        ) : (
-          <Circle className="w-3 h-3 text-rose-500" />
-        )}
-        <span className="text-[10px] font-black uppercase tracking-wider">
-          Player {player.symbol}
+      <div className="flex items-center gap-2 mb-1.5">
+        <div className={`flex items-center justify-center w-6 h-6 rounded ${
+          isActive ? "bg-primary" : "bg-muted"
+        }`}>
+          {player.symbol === SymbolType.X ? (
+            <X className={`w-4 h-4 ${isActive ? "text-primary-foreground" : "text-muted-foreground"}`} strokeWidth={2.5} />
+          ) : (
+            <Circle className={`w-3.5 h-3.5 ${isActive ? "text-primary-foreground" : "text-muted-foreground"}`} strokeWidth={2.5} />
+          )}
+        </div>
+        <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+          {player.symbol}
         </span>
+        {isCurrentPlayer && (
+          <span className="ml-auto text-[10px] font-bold uppercase tracking-wide text-primary">
+            YOU
+          </span>
+        )}
       </div>
-      <p className="font-bold truncate">{player.name}</p>
-      {player.pending && <p className="text-xs text-slate-400">Waiting...</p>}
+      <p className="font-medium text-sm truncate">{player.name}</p>
+      {player.pending && <p className="text-xs text-muted-foreground">Waiting...</p>}
     </div>
   );
 }

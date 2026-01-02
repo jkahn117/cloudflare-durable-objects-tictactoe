@@ -41,10 +41,11 @@ export type Board = (SymbolType | null)[];
 export type Game = {
   players: Players;
   board: Board;
+  currentTurn: SymbolType;
   winner?: SymbolType | "Draw" | null;
 };
 
 export type GameConfig = {
-  opponentType: "human" | "ai";
+  opponentType: PlayerType;
   aiLevel?: AILevel;
 };
