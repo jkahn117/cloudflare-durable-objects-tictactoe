@@ -7,7 +7,7 @@
     "build": "vite build",
     "serve": "vite preview",
     "test": "vitest run",
-    "deploy": "pnpm run build && wrangler deploy",
+    "deploy": "CLOUDFLARE_ENV=production pnpm run build && wrangler deploy -e production",
     "preview": "pnpm run build && vite preview",
     "cf-typegen": "wrangler types"
   },

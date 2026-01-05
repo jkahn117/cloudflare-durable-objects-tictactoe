@@ -4,8 +4,7 @@ import {
   WorkflowStep,
 } from "cloudflare:workers";
 import { SymbolType, PlayerType, AIPlayer } from "@/types";
-import { BotPlayer } from "@/bots/BotPlayer";
-import { createBot } from "@/bots/BotFactory";
+import { createBot, BotPlayer } from "@/bots/BotPlayer";
 import {
   GameWorkflowParams,
   MoveEvent,
@@ -26,10 +25,7 @@ import { createAgentHelper } from "./utils/agentUtils";
 /**
  * HumanVsAIWorkflow orchestrates a tic-tac-toe game between a human player and an AI.
  */
-export class HumanVsAIWorkflow extends WorkflowEntrypoint<
-  Env,
-  GameWorkflowParams
-> {
+export class HumanVsAIWorkflow extends WorkflowEntrypoint<Env, GameWorkflowParams> {
   async run(
     event: WorkflowEvent<GameWorkflowParams>,
     step: WorkflowStep
@@ -38,8 +34,7 @@ export class HumanVsAIWorkflow extends WorkflowEntrypoint<
     const agent = createAgentHelper(this.env, gameSlug);
 
     // Determine which symbol is AI and which is human
-    const aiSymbol =
-      players.X.type === PlayerType.AI ? SymbolType.X : SymbolType.O;
+    const aiSymbol = players.X.type === PlayerType.AI ? SymbolType.X : SymbolType.O;
     const humanSymbol = aiSymbol === SymbolType.X ? SymbolType.O : SymbolType.X;
 
     // Get AI player configuration and create appropriate bot
@@ -120,11 +115,7 @@ export class HumanVsAIWorkflow extends WorkflowEntrypoint<
       const winner = checkWinner(newBoard);
       const nextTurn = getNextTurn(aiSymbol);
 
-      await agent.updateBoard({
-        board: newBoard,
-        currentTurn: nextTurn,
-        winner,
-      });
+      await agent.updateBoard({ board: newBoard, currentTurn: nextTurn, winner });
 
       return {
         board: newBoard,
@@ -159,44 +150,34 @@ export class HumanVsAIWorkflow extends WorkflowEntrypoint<
       return { state, timeout: true };
     }
 
-    const newState = await step.do(
-      `apply-human-move-${state.moveCount}`,
-      async () => {
-        const { position, playerSymbol } = moveEvent.payload;
+    const newState = await step.do(`apply-human-move-${state.moveCount}`, async () => {
+      const { position, playerSymbol } = moveEvent.payload;
 
-        // Validate correct player
-        if (playerSymbol !== humanSymbol) {
-          await agent.setError(`It's not ${playerSymbol}'s turn`, playerSymbol);
-          return state;
-        }
-
-        // Validate move position
-        if (!validateMove(state.board, position)) {
-          await agent.setError(
-            `Invalid move: position ${position} is not available`,
-            playerSymbol
-          );
-          return state;
-        }
-
-        // Apply valid move
-        const newBoard = applyMove(state.board, position, humanSymbol);
-        const winner = checkWinner(newBoard);
-        const nextTurn = getNextTurn(humanSymbol);
-
-        await agent.updateBoard({
-          board: newBoard,
-          currentTurn: nextTurn,
-          winner,
-        });
-
-        return {
-          board: newBoard,
-          currentTurn: nextTurn,
-          moveCount: state.moveCount + 1,
-        };
+      // Validate correct player
+      if (playerSymbol !== humanSymbol) {
+        await agent.setError(`It's not ${playerSymbol}'s turn`, playerSymbol);
+        return state;
       }
-    );
+
+      // Validate move position
+      if (!validateMove(state.board, position)) {
+        await agent.setError(`Invalid move: position ${position} is not available`, playerSymbol);
+        return state;
+      }
+
+      // Apply valid move
+      const newBoard = applyMove(state.board, position, humanSymbol);
+      const winner = checkWinner(newBoard);
+      const nextTurn = getNextTurn(humanSymbol);
+
+      await agent.updateBoard({ board: newBoard, currentTurn: nextTurn, winner });
+
+      return {
+        board: newBoard,
+        currentTurn: nextTurn,
+        moveCount: state.moveCount + 1,
+      };
+    });
 
     return { state: newState, timeout: false };
   }
