@@ -3,14 +3,8 @@ import { getAgentByName } from "agents";
 import { env } from "cloudflare:workers";
 import { LobbyAgent, LobbyState } from "@/agents/Lobby";
 import { GameAgent, GameState } from "@/agents/Game";
-import {
-  AILevel,
-  Board,
-  GameConfig,
-  Players,
-  PlayerType,
-  SymbolType,
-} from "@/types";
+import { GameConfig, Players, PlayerType, SymbolType } from "@/types";
+import { GameWorkflowParams } from "@/workflows/utils/types";
 
 // ============================================================================
 // LOBBY OPERATIONS
@@ -45,16 +39,15 @@ export const getLobbyState = createServerFn().handler(
 
 /**
  * Creates a new game with the specified configuration.
- * Randomly assigns X or O to the creator. If opponent is AI, sets up AI player immediately.
+ * Randomly assigns X or O to the creator.
+ * For AI games: starts the HumanVsAI workflow immediately.
+ * For human games: waits for second player to join before starting workflow.
  *
  * @param {GameConfig} data - Game configuration object:
  *   - opponentType: "human" | "ai" - Type of opponent
  *   - aiLevel?: AILevel - Required if opponentType is "ai" (BEGINNER | INTERMEDIATE | EXPERT)
  *
- * @returns {Promise<{slug: string, creatorSymbol: SymbolType}>} Object containing:
- *   - slug: Unique game identifier
- *   - creatorSymbol: Symbol assigned to the game creator (X or O)
- *   - waitingForPlayer: boolean - Whether the game is waiting for a second player
+ * @returns {Promise<{slug: string, creatorSymbol: SymbolType, waitingForPlayer: boolean}>}
  */
 export const createGame = createServerFn({ method: "POST" })
   .inputValidator((config: GameConfig) => config)
@@ -79,17 +72,14 @@ export const createGame = createServerFn({ method: "POST" })
       const opponentSymbol =
         creatorSymbol === SymbolType.X ? SymbolType.O : SymbolType.X;
 
-      // Configure based on opponent type
-      if (data.opponentType === "ai") {
-        // Set AI opponent immediately
-        const currentState = await game.state;
-        await game.setState({
-          ...currentState,
-          game: {
-            ...currentState.game!,
-            players: {
+      // Configure players based on opponent type
+      const players: Players =
+        data.opponentType === "ai"
+          ? ({
               [creatorSymbol]: {
-                ...currentState.game!.players[creatorSymbol],
+                name: "Player",
+                symbol: creatorSymbol,
+                type: PlayerType.HUMAN,
                 pending: false,
               },
               [opponentSymbol]: {
@@ -99,32 +89,61 @@ export const createGame = createServerFn({ method: "POST" })
                 level: data.aiLevel!,
                 pending: false,
               },
-            } as Players,
-          },
-          waitingForPlayers: false,
-          inProgress: true,
+            } as Players)
+          : ({
+              [creatorSymbol]: {
+                name: "Player 1",
+                symbol: creatorSymbol,
+                type: PlayerType.HUMAN,
+                pending: false,
+              },
+              [opponentSymbol]: {
+                name: "Waiting...",
+                symbol: opponentSymbol,
+                type: PlayerType.HUMAN,
+                pending: true,
+              },
+            } as Players);
+
+      // For AI games, start the workflow immediately
+      if (data.opponentType === "ai") {
+        const workflowParams: GameWorkflowParams = {
+          gameSlug: slug,
+          players,
+          startingTurn: SymbolType.X,
+        };
+
+        // Create workflow instance with game slug as ID
+        const instance = await env.HUMAN_VS_AI_WORKFLOW.create({
+          id: slug,
+          params: workflowParams,
         });
-      } else {
+
+        // Update game state with workflow ID
         const currentState = await game.state;
         await game.setState({
           ...currentState,
           game: {
             ...currentState.game!,
-            players: {
-              [creatorSymbol]: {
-                ...currentState.game!.players[creatorSymbol],
-                pending: false,
-              },
-              [opponentSymbol]: {
-                name: "pending",
-                symbol: opponentSymbol,
-                type: PlayerType.HUMAN,
-                pending: true,
-              },
-            } as Players,
+            players,
+            currentTurn: SymbolType.X,
           },
           waitingForPlayers: false,
           inProgress: true,
+          workflowInstanceId: instance.id,
+        });
+      } else {
+        // Human vs Human - wait for second player before starting workflow
+        const currentState = await game.state;
+        await game.setState({
+          ...currentState,
+          game: {
+            ...currentState.game!,
+            players,
+            currentTurn: SymbolType.X,
+          },
+          waitingForPlayers: true,
+          inProgress: false,
         });
       }
 
@@ -146,12 +165,7 @@ export const createGame = createServerFn({ method: "POST" })
  * @param {Object} data - Request payload:
  *   - slug: string - Unique game identifier
  *
- * @returns {Promise<GameState>} Current game state including:
- *   - slug: Game identifier
- *   - waitingForPlayers: boolean - Whether game is waiting for a second player
- *   - inProgress: boolean - Whether game is active
- *   - game: Game data (board, players, winner)
- *   - createdAt/updatedAt: Timestamps
+ * @returns {Promise<GameState>} Current game state
  */
 export const getGameState = createServerFn()
   .inputValidator((data: { slug: string }) => data)
@@ -160,75 +174,17 @@ export const getGameState = createServerFn()
     return serializeGameState(await game.state);
   });
 
-/**
- * Makes a move on the board for the specified player.
- * If the opponent is AI and the game continues, automatically triggers AI's move.
- *
- * @param {Object} data - Request payload:
- *   - slug: string - Unique game identifier
- *   - position: number - Board position (0-8) to place symbol
- *   - playerSymbol: SymbolType - Symbol of the player making the move (X or O)
- *
- * @returns {Promise<GameState>} Updated game state after move(s)
- *
- * @throws {Error} If position is invalid or already occupied
- */
-export const makeMove = createServerFn({ method: "POST" })
-  .inputValidator(
-    (data: { slug: string; position: number; playerSymbol: SymbolType }) => data
-  )
-  .handler(async ({ data }): Promise<GameState> => {
-    const game = await getAgentByName<Env, GameAgent>(env.GameAgent, data.slug);
-    const state = await game.state;
-
-    if (!state.game) throw new Error("Game not found");
-    if (state.game.board[data.position] !== null)
-      throw new Error("Invalid move");
-
-    // Apply move
-    const newBoard = [...state.game.board];
-    newBoard[data.position] = data.playerSymbol;
-
-    const winner = calculateWinner(newBoard);
-
-    await game.setState({
-      ...state,
-      game: { ...state.game, board: newBoard, winner },
-      updatedAt: new Date().toISOString(),
-    });
-
-    // If AI opponent and not game over, make AI move
-    const opponentSymbol =
-      data.playerSymbol === SymbolType.X ? SymbolType.O : SymbolType.X;
-    const opponent = state.game.players[opponentSymbol];
-
-    if (opponent.type === PlayerType.AI && !winner) {
-      const aiMove = await game.makeAIMove(opponentSymbol);
-      const aiBoard = [...newBoard];
-      aiBoard[aiMove] = opponentSymbol;
-      const aiWinner = calculateWinner(aiBoard);
-
-      const updatedState = await game.state;
-      await game.setState({
-        ...updatedState,
-        game: { ...updatedState.game!, board: aiBoard, winner: aiWinner },
-        updatedAt: new Date().toISOString(),
-      });
-    }
-
-    return serializeGameState(await game.state);
-  });
+// NOTE: makeMove server function removed - client uses useAgent.setState() directly
+// GameAgent.onStateUpdate detects moves and forwards them to the workflow
 
 /**
  * Allows a second player to join an existing game that is waiting for players.
- * Assigns the pending symbol to the joining player and starts the game.
+ * Assigns the pending symbol to the joining player and starts the HumanVsHuman workflow.
  *
  * @param {Object} data - Request payload:
  *   - slug: string - Unique game identifier
  *
- * @returns {Promise<{state: GameState, playerSymbol: SymbolType}>} Object containing:
- *   - state: Updated game state
- *   - playerSymbol: Symbol assigned to the joining player (X or O)
+ * @returns {Promise<{state: GameState, playerSymbol: SymbolType}>}
  *
  * @throws {Error} If game is already full or not waiting for players
  */
@@ -245,26 +201,46 @@ export const joinGame = createServerFn({ method: "POST" })
       const state = await game.state;
 
       if (!state.waitingForPlayers) throw new Error("Game full");
+      if (!state.game) throw new Error("Game not initialized");
 
       // Find which symbol is pending
-      const pendingSymbol = state.game!.players.X.pending
+      const pendingSymbol = state.game.players.X.pending
         ? SymbolType.X
         : SymbolType.O;
 
+      // Update player to not pending
+      const updatedPlayers: Players = {
+        ...state.game.players,
+        [pendingSymbol]: {
+          ...state.game.players[pendingSymbol],
+          name: "Player 2",
+          pending: false,
+        },
+      } as Players;
+
+      // Start the HumanVsHuman workflow now that both players are ready
+      const workflowParams: GameWorkflowParams = {
+        gameSlug: data.slug,
+        players: updatedPlayers,
+        startingTurn: SymbolType.X,
+      };
+
+      const instance = await env.HUMAN_VS_HUMAN_WORKFLOW.create({
+        id: data.slug,
+        params: workflowParams,
+      });
+
+      // Update game state
       await game.setState({
         ...state,
         game: {
-          ...state.game!,
-          players: {
-            ...state.game!.players,
-            [pendingSymbol]: {
-              ...state.game!.players[pendingSymbol],
-              pending: false,
-            },
-          } as Players,
+          ...state.game,
+          players: updatedPlayers,
+          currentTurn: SymbolType.X,
         },
         waitingForPlayers: false,
         inProgress: true,
+        workflowInstanceId: instance.id,
       });
 
       return {
@@ -275,84 +251,55 @@ export const joinGame = createServerFn({ method: "POST" })
   );
 
 /**
- * Switches a pending player slot to an AI opponent.
- * Used when a human opponent doesn't join in time.
+ * Gets the status of the workflow managing a game.
+ * Useful for debugging and monitoring.
  *
  * @param {Object} data - Request payload:
  *   - slug: string - Unique game identifier
- *   - aiLevel: AILevel - Difficulty level for AI (BEGINNER | INTERMEDIATE | EXPERT)
  *
- * @returns {Promise<GameState>} Updated game state with AI opponent configured
+ * @returns {Promise<{status: string, workflowId?: string}>}
  */
-export const switchToAI = createServerFn({ method: "POST" })
-  .inputValidator((data: { slug: string; aiLevel: AILevel }) => data)
-  .handler(async ({ data }): Promise<GameState> => {
-    const game = await getAgentByName<Env, GameAgent>(env.GameAgent, data.slug);
-    const state = await game.state;
+export const getWorkflowStatus = createServerFn()
+  .inputValidator((data: { slug: string }) => data)
+  .handler(
+    async ({ data }): Promise<{ status: string; workflowId?: string }> => {
+      const game = await getAgentByName<Env, GameAgent>(
+        env.GameAgent,
+        data.slug
+      );
+      const state = await game.state;
 
-    // Find pending player
-    const pendingSymbol = state.game!.players.X.pending
-      ? SymbolType.X
-      : SymbolType.O;
+      if (!state.workflowInstanceId) {
+        return { status: "not_started" };
+      }
 
-    await game.setState({
-      ...state,
-      game: {
-        ...state.game!,
-        players: {
-          ...state.game!.players,
-          [pendingSymbol]: {
-            name: `AI (${data.aiLevel})`,
-            symbol: pendingSymbol,
-            type: PlayerType.AI,
-            level: data.aiLevel,
-            pending: false,
-          },
-        } as Players,
-      },
-      waitingForPlayers: false,
-      inProgress: true,
-    });
+      try {
+        // Try AI workflow first
+        const hasAI =
+          state.game?.players.X.type === PlayerType.AI ||
+          state.game?.players.O.type === PlayerType.AI;
 
-    return serializeGameState(await game.state);
-  });
+        const workflow = hasAI
+          ? await env.HUMAN_VS_AI_WORKFLOW.get(state.workflowInstanceId)
+          : await env.HUMAN_VS_HUMAN_WORKFLOW.get(state.workflowInstanceId);
+
+        const status = await workflow.status();
+        return {
+          status: status.status,
+          workflowId: state.workflowInstanceId,
+        };
+      } catch (error) {
+        return {
+          status: "error",
+          workflowId: state.workflowInstanceId,
+        };
+      }
+    }
+  );
 
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
-
-/**
- * Calculates the winner of the game based on the current board state.
- * Checks all possible winning combinations (rows, columns, diagonals).
- *
- * @param {Board} board - Array of 9 positions representing the game board
- *
- * @returns {SymbolType | "Draw" | undefined}
- *   - SymbolType (X or O) if there's a winner
- *   - "Draw" if all positions are filled with no winner
- *   - undefined if game is still in progress
- */
-function calculateWinner(board: Board): SymbolType | "Draw" | undefined {
-  const lines = [
-    [0, 1, 2],
-    [3, 4, 5],
-    [6, 7, 8], // rows
-    [0, 3, 6],
-    [1, 4, 7],
-    [2, 5, 8], // cols
-    [0, 4, 8],
-    [2, 4, 6], // diagonals
-  ];
-
-  for (const [a, b, c] of lines) {
-    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-      return board[a]!;
-    }
-  }
-
-  if (board.every(Boolean)) return "Draw";
-  return undefined;
-}
 
 /**
  * Serializes game state for client transmission.
@@ -370,5 +317,6 @@ function serializeGameState(state: GameState): GameState {
     createdAt: state.createdAt,
     updatedAt: state.updatedAt,
     game: state.game,
+    workflowInstanceId: state.workflowInstanceId,
   };
 }

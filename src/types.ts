@@ -42,7 +42,11 @@ export type Game = {
   players: Players;
   board: Board;
   currentTurn: SymbolType;
-  winner?: SymbolType | "Draw" | null;
+  winner?: SymbolType | "Draw" | "Timeout" | null;
+  /** Error message to display to the user (e.g., invalid move, timeout warning) */
+  errorMessage?: string | null;
+  /** Symbol of player who caused the error or timed out */
+  errorPlayer?: SymbolType | null;
 };
 
 export type GameConfig = {

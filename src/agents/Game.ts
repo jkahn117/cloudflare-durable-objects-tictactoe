@@ -1,14 +1,14 @@
-import { Agent, callable } from "agents";
+import { Agent } from "agents";
 import {
   AILevel,
   AIPlayer,
+  Board,
   Game,
   HumanPlayer,
   PlayerType,
   SymbolType,
 } from "@/types";
-import { BotPlayer } from "../bots/BotPlayer";
-import { BotExpert } from "../bots/BotExpert";
+import { MOVE_EVENT_TYPE, MoveEvent } from "@/workflows/utils/types";
 
 /**
  * GameState represents the complete state of a tic-tac-toe game.
@@ -20,13 +20,16 @@ export type GameState = {
   inProgress: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Game data - optional during initial setup before workflow starts */
   game?: Game;
+  /** ID of the workflow instance managing this game */
+  workflowInstanceId?: string;
 };
 
 /**
  * GameAgent is a Cloudflare Durable Object that manages the state and logic
  * for individual tic-tac-toe games. Each game gets its own isolated instance.
- * 
+ *
  * Responsibilities:
  * - Maintain game state (board, players, turn, winner)
  * - Execute AI moves when appropriate
@@ -35,16 +38,10 @@ export type GameState = {
  */
 export class GameAgent extends Agent<Env, GameState> {
   /**
-   * Default state for a new game before setup() is called.
-   * Games start in "waiting for players" mode.
+   * Tracks the last known board state to detect new moves.
+   * Stored as instance property (not in state) to avoid recursive setState calls.
    */
-  initialState: GameState = {
-    slug: "",
-    waitingForPlayers: true,
-    inProgress: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+  private lastKnownBoard: Board | null = null;
 
   /**
    * Template for a fresh game board and player configuration.
@@ -72,6 +69,19 @@ export class GameAgent extends Agent<Env, GameState> {
   };
 
   /**
+   * Default state for a new game before setup() is called.
+   * Games start in "waiting for players" mode.
+   */
+  initialState: GameState = {
+    slug: "",
+    waitingForPlayers: true,
+    inProgress: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    game: this.initialGame,
+  };
+
+  /**
    * Lifecycle hook called when the Durable Object is first created.
    * Sets up the SQL database schema for storing move history.
    */
@@ -86,100 +96,141 @@ export class GameAgent extends Agent<Env, GameState> {
 
   /**
    * Initializes a new game with the given slug identifier.
-   * If the AI has the first turn (X), automatically triggers the AI move.
-   * 
+   * The workflow will handle game initialization and AI moves.
+   *
    * @param {Object} params - Setup parameters
    * @param {string} params.slug - Unique identifier for this game
+   * @param {string} [params.workflowInstanceId] - ID of the workflow managing this game
    */
-  setup({ slug }: { slug: string }): void {
+  setup({
+    slug,
+    workflowInstanceId,
+  }: {
+    slug: string;
+    workflowInstanceId?: string;
+  }): void {
     this.setState({
       ...this.initialState,
       game: this.initialGame,
       slug,
+      workflowInstanceId,
     });
+  }
 
-    if (this.isAIMove()) {
-      this.makeAIMove(this.aiPlayer()!);
+  /**
+   * Called when state is updated (by workflow or client via useAgent).
+   * Detects new moves from client and forwards them to the workflow.
+   *
+   * @param state - New state
+   * @param source - "server" if from workflow, Connection if from client
+   */
+  async onStateUpdate(
+    state: GameState | undefined,
+    source: "server" | unknown
+  ): Promise<void> {
+    if (!state || !state.game || !state.workflowInstanceId) return;
+
+    // Only process client-initiated updates (not workflow updates)
+    if (source === "server") {
+      console.log(`[GameAgent:${state.slug}] Workflow updated state`);
+      // Update lastKnownBoard to match workflow state (no setState to avoid recursion)
+      this.lastKnownBoard = [...state.game.board];
+      return;
+    }
+
+    // Detect if client made a new move by comparing boards
+    const newMove = this.detectNewMove(this.lastKnownBoard, state.game.board);
+
+    if (newMove) {
+      console.log(
+        `[GameAgent:${state.slug}] Client move detected: position ${newMove.position} by ${newMove.playerSymbol}`
+      );
+
+      // Update lastKnownBoard before sending to workflow (no setState to avoid recursion)
+      this.lastKnownBoard = [...state.game.board];
+
+      // Forward the move to the workflow
+      await this.sendMoveToWorkflow(state, newMove);
     }
   }
 
   /**
-   * Determines which symbol (if any) is controlled by the AI player.
+   * Detects a new move by comparing previous and current board states.
    *
-   * @returns {SymbolType | null} The AI player's symbol (X or O), or null if no AI player exists
+   * @returns MoveEvent if a new move is detected, null otherwise
    */
-  aiPlayer(): SymbolType | null {
-    const game = this.state.game;
-    if (!game) return null;
-
-    if (game.players.X.type === PlayerType.AI) {
-      return SymbolType.X;
+  private detectNewMove(
+    previousBoard: Board | null,
+    currentBoard: Board
+  ): MoveEvent | null {
+    if (!previousBoard) {
+      // First move - find the single occupied position
+      const position = currentBoard.findIndex((cell) => cell !== null);
+      if (position === -1) return null;
+      return {
+        position,
+        playerSymbol: currentBoard[position]!,
+      };
     }
-    if (game.players.O.type === PlayerType.AI) {
-      return SymbolType.O;
+
+    // Find the position that changed from null to a symbol
+    for (let i = 0; i < 9; i++) {
+      if (previousBoard[i] === null && currentBoard[i] !== null) {
+        return {
+          position: i,
+          playerSymbol: currentBoard[i]!,
+        };
+      }
     }
 
     return null;
   }
 
   /**
-   * Checks if it's currently the AI player's turn to move.
-   *
-   * @returns {boolean} True if the current turn belongs to an AI player
+   * Sends a move event to the appropriate workflow.
    */
-  isAIMove(): boolean {
-    const game = this.state.game;
+  private async sendMoveToWorkflow(
+    state: GameState,
+    move: MoveEvent
+  ): Promise<void> {
+    if (!state.workflowInstanceId || !state.game) return;
 
-    if (!game || game.winner) return false;
+    try {
+      const hasAI =
+        state.game.players.X.type === PlayerType.AI ||
+        state.game.players.O.type === PlayerType.AI;
 
-    return game.currentTurn === this.aiPlayer();
-  }
+      const workflow = hasAI
+        ? await this.env.HUMAN_VS_AI_WORKFLOW.get(state.workflowInstanceId)
+        : await this.env.HUMAN_VS_HUMAN_WORKFLOW.get(state.workflowInstanceId);
 
-  /**
-   * Executes an AI move for the specified player symbol.
-   * This method is callable from the client via RPC.
-   * 
-   * @param {SymbolType} playerSymbol - The symbol (X or O) of the AI player to move
-   * @returns {Promise<number>} The board position (0-8) where the AI chose to move
-   * @throws {Error} If the specified player is not an AI player
-   */
-  @callable()
-  async makeAIMove(playerSymbol: SymbolType): Promise<number> {
-    const player = this.state.game!.players[playerSymbol];
+      await workflow.sendEvent({
+        type: MOVE_EVENT_TYPE,
+        payload: move,
+      });
 
-    if (player.type !== PlayerType.AI) {
-      throw new Error("Cannot make AI move for human player");
-    }
-
-    // TypeScript knows player is AIPlayer here
-    const bot = this.getBotForLevel(player.level);
-    return await bot.makeMove(this.state.game!.board);
-  }
-
-  /**
-   * Creates and returns the appropriate bot implementation based on AI difficulty level.
-   * 
-   * @param {AILevel} level - The difficulty level (BEGINNER, INTERMEDIATE, or EXPERT)
-   * @returns {BotPlayer} Instance of the bot implementation for the specified level
-   * 
-   * @note Currently only EXPERT is fully implemented. BEGINNER and INTERMEDIATE
-   *       fall through to EXPERT as placeholders.
-   */
-  private getBotForLevel(level: AILevel): BotPlayer {
-    switch (level) {
-      case AILevel.BEGINNER:
-      // return new BotBeginner(this.env);
-      case AILevel.INTERMEDIATE:
-      // return new BotIntermediate(this.env);
-      case AILevel.EXPERT:
-        return new BotExpert(this.env);
+      console.log(`[GameAgent:${state.slug}] Move sent to workflow`);
+    } catch (error) {
+      console.error(
+        `[GameAgent:${state.slug}] Failed to send move to workflow:`,
+        error
+      );
+      // Set error message on state so client knows something went wrong
+      this.setState({
+        ...state,
+        game: {
+          ...state.game!,
+          errorMessage: "Failed to process move. Please try again.",
+          errorPlayer: move.playerSymbol,
+        },
+      });
     }
   }
 
   /**
    * Deletes this game and destroys the Durable Object instance.
    * Cleans up all associated storage and resources.
-   * 
+   *
    * @returns {Promise<void>}
    */
   async delete(): Promise<void> {

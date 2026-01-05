@@ -29,7 +29,19 @@
   ],
   "ai": {
     "binding": "AI"
-  }
+  },
+  "workflows": [
+    {
+      "name": "human-vs-ai-workflow",
+      "binding": "HUMAN_VS_AI_WORKFLOW",
+      "class_name": "HumanVsAIWorkflow"
+    },
+    {
+      "name": "human-vs-human-workflow",
+      "binding": "HUMAN_VS_HUMAN_WORKFLOW",
+      "class_name": "HumanVsHumanWorkflow"
+    }
+  ]
   // "env": {
   //   "production": {
   //     "vars": {
