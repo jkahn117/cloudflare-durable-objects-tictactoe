@@ -80,11 +80,18 @@ export class HumanVsHumanWorkflow extends WorkflowEntrypoint<
       // Check for game end
       const winner = checkWinner(state.board);
       if (winner) {
+        // Schedule cleanup after delay
+        await step.do("schedule-cleanup", async () => {
+          await agent.endGame(winner);
+        });
         return { winner, finalBoard: state.board, moves: state.moveCount };
       }
     }
 
-    // If we exit the loop without a winner, it's a draw
+    // Draw - schedule cleanup
+    await step.do("schedule-cleanup", async () => {
+      await agent.endGame("Draw");
+    });
     return { winner: "Draw", finalBoard: state.board, moves: state.moveCount };
   }
 

@@ -1,4 +1,4 @@
-import { Agent } from "agents";
+import { Agent, getAgentByName } from "agents";
 import {
   AILevel,
   AIPlayer,
@@ -9,6 +9,10 @@ import {
   SymbolType,
 } from "@/types";
 import { MOVE_EVENT_TYPE, MoveEvent } from "@/workflows/utils/types";
+import { LobbyAgent } from "./Lobby";
+
+/** Delay before cleaning up a finished game (in seconds) */
+const CLEANUP_DELAY_SECONDS = 60;
 
 /**
  * GameState represents the complete state of a tic-tac-toe game.
@@ -225,6 +229,46 @@ export class GameAgent extends Agent<Env, GameState> {
         },
       });
     }
+  }
+
+  /**
+   * Schedules cleanup of this game after a delay.
+   * Called by the workflow when the game ends (win, draw, or timeout).
+   * Gives players time to see the final result before the game is removed.
+   */
+  async scheduleCleanup(): Promise<void> {
+    const slug = this.state.slug;
+    console.log(
+      `[GameAgent:${slug}] Scheduling cleanup in ${CLEANUP_DELAY_SECONDS} seconds`
+    );
+
+    // Use the Agents SDK schedule method (wraps Durable Object alarms)
+    await this.schedule(CLEANUP_DELAY_SECONDS, "cleanup", { slug });
+  }
+
+  /**
+   * Cleanup handler called by the scheduled alarm.
+   * Removes the game from the lobby and destroys this Durable Object.
+   */
+  async cleanup({ slug }: { slug: string }): Promise<void> {
+    console.log(`[GameAgent:${slug}] Running cleanup`);
+
+    try {
+      // Notify LobbyAgent to remove this game from its state
+      const lobby = await getAgentByName<Env, LobbyAgent>(
+        this.env.LobbyAgent,
+        "lobby"
+      );
+      lobby.removeGame(slug);
+      console.log(`[GameAgent:${slug}] Removed from lobby`);
+    } catch (error) {
+      console.error(`[GameAgent:${slug}] Failed to notify lobby:`, error);
+      // Continue with destruction even if lobby notification fails
+    }
+
+    // Destroy this Durable Object
+    await this.destroy();
+    console.log(`[GameAgent:${slug}] Destroyed`);
   }
 
   /**

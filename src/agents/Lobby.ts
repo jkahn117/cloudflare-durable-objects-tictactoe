@@ -140,12 +140,12 @@ export class LobbyAgent extends Agent<Env, LobbyState> {
   /**
    * Deletes a game and removes it from the lobby and database.
    * Callable from the client via RPC.
-   * 
+   *
    * This method:
    * 1. Calls the GameAgent's delete() method to destroy the Durable Object
    * 2. Removes the game from the SQL database
    * 3. Filters the game out of both lobby state lists
-   * 
+   *
    * @param {string} slug - The unique identifier of the game to delete
    * @returns {Promise<void>}
    * @throws {Error} If no slug is provided
@@ -157,6 +157,23 @@ export class LobbyAgent extends Agent<Env, LobbyState> {
     }
     const game = await getAgentByName<Env, GameAgent>(this.env.GameAgent, slug);
     await game.delete();
+    this.removeGame(slug);
+  }
+
+  /**
+   * Removes a game from the lobby state and database.
+   * Called by GameAgent during self-cleanup after game ends.
+   *
+   * Unlike deleteGame(), this does NOT call GameAgent.delete() since
+   * the GameAgent is already destroying itself.
+   *
+   * @param {string} slug - The unique identifier of the game to remove
+   */
+  removeGame(slug: string): void {
+    if (!slug) return;
+
+    console.log(`[LobbyAgent] Removing game ${slug} from lobby`);
+
     this.sql`DELETE FROM games WHERE slug = ${slug}`;
     this.setState({
       gamesSeekingPlayers: this.state.gamesSeekingPlayers.filter(

@@ -74,7 +74,7 @@ export class GameAgentHelper {
   }
 
   /**
-   * Sets the game as ended due to timeout.
+   * Sets the game as ended due to timeout and schedules cleanup.
    */
   async setTimeoutWinner(
     timedOutPlayer: SymbolType,
@@ -94,6 +94,9 @@ export class GameAgentHelper {
       inProgress: false,
       updatedAt: new Date().toISOString(),
     });
+
+    // Schedule cleanup after delay
+    await agent.scheduleCleanup();
   }
 
   /**
@@ -105,6 +108,24 @@ export class GameAgentHelper {
       currentTurn,
       winner: null,
     });
+  }
+
+  /**
+   * Marks the game as ended and schedules cleanup.
+   * Called when the game ends normally (win or draw).
+   */
+  async endGame(_winner: SymbolType | "Draw"): Promise<void> {
+    const agent = await this.getAgent();
+    const currentState = await agent.state;
+
+    await agent.setState({
+      ...currentState,
+      inProgress: false,
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Schedule cleanup after delay
+    await agent.scheduleCleanup();
   }
 }
 
