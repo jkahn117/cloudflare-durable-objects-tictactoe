@@ -1,7 +1,4 @@
-import { AILevel, Board } from "@/types";
-import { BotBeginner } from "./BotBeginner";
-import { BotIntermediate } from "./BotIntermediate";
-import { BotExpert } from "./BotExpert";
+import { Board } from "@/types";
 
 /**
  * Interface for AI bot players
@@ -83,21 +80,5 @@ export abstract class BaseBotPlayer implements BotPlayer {
 
     // Strategy 2: No valid moves (board full or invalid)
     throw new Error("No valid moves available on the board");
-  }
-}
-
-/**
- * Factory function to create a bot instance based on AI difficulty level.
- */
-export function createBot(env: Env, level: AILevel): BotPlayer {
-  switch (level) {
-    case AILevel.BEGINNER:
-      return new BotBeginner(env);
-    case AILevel.INTERMEDIATE:
-      return new BotIntermediate(env);
-    case AILevel.EXPERT:
-      return new BotExpert(env);
-    default:
-      throw new Error(`Unknown AI level: ${level}`);
   }
 }
